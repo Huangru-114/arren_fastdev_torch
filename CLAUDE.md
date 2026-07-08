@@ -123,9 +123,10 @@ results/           # 精简结果提交入库，重文件本地保留
 
 ## 9. slurm 层职责边界
 
-- `slurm/generate_jobs.py` 只读取 `QUEUE.md` 中 `pending` 项，渲染出 `.sbatch` 文件放入
-  `slurm/pending/`，commit 入库，**不执行**任何提交命令。
-- `.sbatch` 模板结构固定，通过 apptainer 容器承载完整 GPU/torch 环境：
+- `slurm/generate_jobs.py` 只读取 `QUEUE.md` 中 `pending` 项，渲染出 `.sh` 脚本（普通 shell
+  脚本，用 `sbatch xxx.sh` 提交，**不要用 `.sbatch` 作为文件扩展名**）放入 `slurm/pending/`，
+  commit 入库，**不执行**任何提交命令。
+- 脚本结构固定，通过 apptainer 容器承载完整 GPU/torch 环境：
 
   ```bash
   #!/bin/bash
@@ -135,6 +136,7 @@ results/           # 精简结果提交入库，重文件本地保留
   #SBATCH -t {{ time_limit }}
   #SBATCH -A {{ account }}
   #SBATCH -p gpu
+
   module load GPU/buildenv-nvhpc/25.9-cu13.0
   apptainer exec --nv {{ container_image }} python3 experiments/run_single.py --config {{ config_path }}
   ```
@@ -144,10 +146,26 @@ results/           # 精简结果提交入库，重文件本地保留
   `experiments/run_single.py`，**不直接调用**各篇论文自己的 `main.py`——后者只作为
   `strategies/` 提炼逻辑时的参考，不再是实际运行入口。
 - **容器镜像（如 `torch_fl.sif`）是外部固定依赖，不属于本仓库管理范围**：不需要维护、
-  不需要构建定义、Claude Code 不应尝试修改或重建它，只需要在生成 `.sbatch` 时引用其
+  不需要构建定义、Claude Code 不应尝试修改或重建它，只需要在生成脚本时引用其
   已知路径即可。
 - Claude Code 沙盒自身的 Tier A 测试环境（见第 7 节）与 HPC 容器环境相互独立，
   不需要保持一致，也不应尝试在沙盒里复现完整 GPU/CUDA 环境。
+
+## 11. 日志规范
+
+- `experiments/run_single.py` 训练循环中，**至少每 10 个 round 输出一次**当前状态到日志，
+  内容必须包含：当前 round 数、主任务指标（如 accuracy/loss）、攻击相关指标（如 ASR，
+  若适用）、防御相关指标（若适用）、以及**累计训练耗时**（如 `elapsed_time` 或
+  `time_per_round`）。
+- 格式建议统一为结构化的一行（如 JSON Lines 或固定顺序的 `key=value` 形式），
+  便于后续脚本化解析 `log_tail.txt`，而不是自然语言描述句。例如：
+
+  ```
+  round=10 acc=0.71 loss=0.83 asr=0.42 elapsed_sec=812.3
+  ```
+
+- 这个频率与格式对所有 strategy 统一生效，不由具体攻击/防御的代码自行决定，
+  应在 `experiments/run_single.py`（编排层）里统一实现，而不是分散在每个 hook 里各写一遍。
 
 ## 10. 何时自主推进，何时停下确认
 
