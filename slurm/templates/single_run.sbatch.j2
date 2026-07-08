@@ -1,0 +1,20 @@
+#!/bin/bash
+#SBATCH --job-name={{ job_name }}
+#SBATCH --gres=gpu:{{ gpus }}
+#SBATCH --mem={{ mem }}
+#SBATCH --time={{ time }}
+#SBATCH --output={{ log_dir }}/{{ job_name }}-%j.out
+
+set -euo pipefail
+
+# Repo root: submit from the repo root, or `export REPO_ROOT=/path/to/repo` first.
+REPO_ROOT="${REPO_ROOT:-${SLURM_SUBMIT_DIR:-$PWD}}"
+
+# ---- environment preparation (edit for your cluster) ----
+{{ env_setup }}
+
+export PYTHONPATH="$REPO_ROOT:$REPO_ROOT/pfl-lib:${PYTHONPATH:-}"
+cd "$REPO_ROOT"
+
+# ---- the only algorithmic entry point ----
+python experiments/run_single.py --config "{{ config_rel_path }}"
