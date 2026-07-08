@@ -3,7 +3,7 @@
 name: badpfl_fedrep_dirichlet_a01
 
 dataset: cifar10
-data_root: ${DATA_ROOT}   # 外部 HPC 路径，运行时由 env/--data-root 注入
+data_root: ${DATA_ROOT}   # 含 cifar-10-batches-py/ 的父目录；外部 HPC 路径，运行时由 env/--data-root 注入
 num_classes: 10
 partition: dirichlet
 dir_alpha: 0.1

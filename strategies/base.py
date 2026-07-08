@@ -43,8 +43,9 @@ class ExperimentConfig:
     dataset: str = "cifar10"
     # dataset root is an external HPC resource (constitution s.5): never a hardcoded
     # absolute path. Keep the ``${DATA_ROOT}`` placeholder here; the real path is
-    # injected at launch from the DATA_ROOT env var or ``--data-root``. Unused by
-    # the ``synthetic`` dataset (Tier A generates data in-memory).
+    # injected at launch from the DATA_ROOT env var or ``--data-root``. For CIFAR-10
+    # (torchvision format) this is the directory CONTAINING ``cifar-10-batches-py/``.
+    # Unused by the ``synthetic`` dataset (Tier A generates data in-memory).
     data_root: str = "${DATA_ROOT}"
     # torchvision download switch. Default off: on HPC the data is pre-staged under
     # data_root, so a wrong path should fail loudly instead of silently hitting the
