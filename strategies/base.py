@@ -46,6 +46,10 @@ class ExperimentConfig:
     # injected at launch from the DATA_ROOT env var or ``--data-root``. Unused by
     # the ``synthetic`` dataset (Tier A generates data in-memory).
     data_root: str = "${DATA_ROOT}"
+    # torchvision download switch. Default off: on HPC the data is pre-staged under
+    # data_root, so a wrong path should fail loudly instead of silently hitting the
+    # network. Set true only when you want auto-download (e.g. a local dev box).
+    download: bool = False
     num_classes: int = 10
     input_channel: int = 3
     partition: str = "dirichlet"          # 'dirichlet' | 'pathological'

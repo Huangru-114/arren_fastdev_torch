@@ -65,11 +65,13 @@ def _torchvision_bundle(name, root, download):
     raise ValueError(f"unknown torchvision dataset {name!r}")
 
 
-def build_dataset(name, root="./data", download=True, synthetic_spec=None):
+def build_dataset(name, root="./data", download=False, synthetic_spec=None):
     """Build a :class:`DatasetBundle`.
 
     ``name='synthetic'`` uses ``synthetic_spec`` (a dict) for a tiny in-memory
-    dataset; any other name is delegated to torchvision.
+    dataset (Tier A, no disk/root needed); any other name is delegated to
+    torchvision, which reads from ``root``. ``download`` defaults to False so a
+    misconfigured ``root`` fails loudly rather than reaching for the network.
     """
     if name == "synthetic":
         spec = synthetic_spec or {}

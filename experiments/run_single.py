@@ -65,6 +65,7 @@ def run(config: ExperimentConfig) -> RunResult:
     bundle = build_dataset(
         config.dataset,
         root=resolve_data_root(config),
+        download=config.download,
         synthetic_spec=config.synthetic,
     )
 
