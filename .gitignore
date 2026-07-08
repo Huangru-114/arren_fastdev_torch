@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.ipynb_checkpoints/
+
+# datasets downloaded locally (never commit)
+/data/
+
+# heavy result artifacts stay on HPC (constitution s.8): commit only
+# metrics.json / summary.md / log_tail.txt under results/<hash>/
+results/**/checkpoints/
+results/**/*.pt
+results/**/*.pth
+results/**/*.ckpt
+results/**/full_log*.txt
+
+# generated slurm logs
+/logs/

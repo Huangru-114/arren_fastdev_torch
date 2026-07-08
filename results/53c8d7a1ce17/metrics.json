@@ -1,0 +1,48 @@
+{
+  "name": "badpfl_fedrep_repro",
+  "config_hash": "53c8d7a1ce17",
+  "acc_mean": 13.9963,
+  "acc_std": 13.7845,
+  "asr_mean": 9.9044,
+  "asr_std": 21.3273,
+  "config": {
+    "name": "badpfl_fedrep_repro",
+    "dataset": "cifar10",
+    "data_root": "${DATA_ROOT}",
+    "download": false,
+    "num_classes": 10,
+    "input_channel": 3,
+    "partition": "dirichlet",
+    "dir_alpha": 0.5,
+    "class_per_client": 2,
+    "balance": true,
+    "fl_method": "fedrep",
+    "model": "resnet10",
+    "client_num": 100,
+    "bad_client_num": 10,
+    "select_client_num_per_round": 10,
+    "total_round": 10,
+    "client_local_step": 15,
+    "client_batch": 32,
+    "learning_rate": 0.1,
+    "agg_rule": "avg",
+    "attack": "bad_pfl",
+    "defense": null,
+    "attack_params": {
+      "target_label": 0,
+      "poison_rate": 0.2,
+      "epsilon": 0.01568627451,
+      "sigma": 0.01568627451,
+      "gen_lr": 0.01,
+      "gen_steps": 30,
+      "pgd_iter": 1
+    },
+    "defense_params": {},
+    "fl_params": {
+      "head_steps": 7
+    },
+    "seed": 2024,
+    "device": "cuda:0",
+    "synthetic": {}
+  }
+}
