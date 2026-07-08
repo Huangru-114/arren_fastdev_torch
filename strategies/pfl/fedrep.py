@@ -6,11 +6,19 @@ Reference for the reproduction target:
   the partial-model-sharing pFL baselines.
 
 Partial sharing rule: the classification head (parameters whose key contains
-``linear``) is private. Local training is two-phase per the FedRep algorithm:
-first update the head with the body frozen, then update the body (representation)
-with the head frozen. The relative number of head steps is configurable via
-``fl_params.head_steps`` (default: half of the local steps, at least one each).
+``linear``) is private. Local training is two-phase per the FedRep algorithm
+(cf. PFLlib ``clientRep.train``): first update the head for a SEPARATE
+``head_steps`` budget with the body frozen, then update the representation for a
+FULL local epoch (``local_steps``) with the head frozen. Head and body use
+separate SGD optimizers. Only the representation is uploaded and aggregated.
+
+``fl_params.head_steps`` sets the head budget (default: half of ``local_steps``).
+The representation always gets the full ``local_steps`` -- it is NOT reduced by
+the head phase. (An earlier version starved it to ``local_steps - head_steps``,
+which under-trained the shared features and collapsed both Acc and ASR.)
 """
+
+import torch
 
 from strategies.base import Client, PFLMethod
 from strategies.registry import register_pfl
@@ -33,24 +41,32 @@ class FedRep(PFLMethod):
             p.requires_grad_(flag)
 
     def local_train(self, client: Client, local_steps: int) -> None:
-        head_steps = int(self.params.get("head_steps", max(1, local_steps // 2)))
-        head_steps = max(1, min(head_steps, local_steps - 1)) if local_steps > 1 else local_steps
-        body_steps = local_steps - head_steps
-
         head, body = self._split_params(client.local_model)
+        head_steps = max(1, int(self.params.get("head_steps", max(1, local_steps // 2))))
 
-        # Phase 1: train the private head, representation frozen.
+        # Separate optimizers for head and body (PFLlib clientRep: optimizer_per
+        # over head params, optimizer over base params). lr is read from the
+        # client's optimizer, so it stays config-driven and is never hardcoded.
+        lr = client.optimizer.param_groups[0]["lr"]
+        head_optimizer = torch.optim.SGD(head, lr=lr)
+        body_optimizer = torch.optim.SGD(body, lr=lr)
+
+        # Phase 1 (head): freeze the representation, train the private head for a
+        # separate head_steps budget on the full local data.
         self._set_requires_grad(body, False)
         self._set_requires_grad(head, True)
         for _ in range(head_steps):
-            client.train_step(client.local_model, client.optimizer)
+            client.train_step(client.local_model, head_optimizer)
 
-        # Phase 2: train the shared representation, head frozen.
+        # Phase 2 (body): freeze the head, train the shared representation for the
+        # FULL local budget (local_steps) -- NOT local_steps - head_steps. The
+        # representation must get a full local epoch (PFLlib clientRep:
+        # max_local_epochs = self.local_epochs).
         self._set_requires_grad(head, False)
         self._set_requires_grad(body, True)
-        for _ in range(body_steps):
-            client.train_step(client.local_model, client.optimizer)
+        for _ in range(local_steps):
+            client.train_step(client.local_model, body_optimizer)
 
-        # restore for safety (e.g. attack generator training uses full model)
+        # restore for anything that reuses the full model (e.g. attack generator).
         self._set_requires_grad(head, True)
         self._set_requires_grad(body, True)
