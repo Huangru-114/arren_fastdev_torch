@@ -3,6 +3,7 @@
 name: badpfl_fedbn_pathological_c2
 
 dataset: cifar10
+data_root: ${DATA_ROOT}   # 外部 HPC 路径，运行时由 env/--data-root 注入
 num_classes: 10
 partition: pathological
 class_per_client: 2

@@ -41,12 +41,30 @@ def set_seed(seed):
         torch.cuda.manual_seed_all(seed)
 
 
+def resolve_data_root(config: ExperimentConfig) -> str:
+    """Expand ``config.data_root`` against the environment (constitution s.5).
+
+    ``${DATA_ROOT}`` -> the DATA_ROOT env var. Real (non-synthetic) datasets
+    require a resolved path; the ``synthetic`` dataset needs none (Tier A).
+    """
+    resolved = os.path.expandvars(config.data_root or "")
+    if config.dataset == "synthetic":
+        return resolved  # unused by the synthetic provider
+    if not resolved or "${" in resolved:
+        raise ValueError(
+            f"data_root is unresolved ({config.data_root!r}); the dataset root is an "
+            "external HPC path -- inject it via the DATA_ROOT env var or --data-root "
+            "(constitution s.5). It is never hardcoded in the repo."
+        )
+    return resolved
+
+
 def run(config: ExperimentConfig) -> RunResult:
     set_seed(config.seed)
 
     bundle = build_dataset(
         config.dataset,
-        root=os.path.join(_REPO_ROOT, "data"),
+        root=resolve_data_root(config),
         synthetic_spec=config.synthetic,
     )
 
@@ -119,10 +137,14 @@ def write_results(config: ExperimentConfig, result: RunResult):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", required=True)
+    parser.add_argument("--data-root", default=None,
+                        help="dataset root (overrides DATA_ROOT / config.data_root); external HPC path")
     parser.add_argument("--no-write", action="store_true", help="run but do not write results/ (smoke tests)")
     args = parser.parse_args()
 
     config = load_config(args.config)
+    if args.data_root is not None:
+        config.data_root = args.data_root
     result = run(config)
     print(
         f"[{result.name}] hash={result.config_hash} "

@@ -19,8 +19,8 @@ from strategies.base import ExperimentConfig
 
 _ALLOWED_PARTITIONS = {"dirichlet", "pathological"}
 _ALLOWED_AGG = {"avg", "average", "median"}
-# fields excluded from the identity hash (do not change experiment semantics)
-_HASH_EXCLUDE = {"device"}
+# fields excluded from the identity hash (runtime/environment, not experiment semantics)
+_HASH_EXCLUDE = {"device", "data_root"}
 
 
 def _field_names():

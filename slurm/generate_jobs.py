@@ -2,10 +2,17 @@
 
 Reads ``experiments/QUEUE.md``, finds rows marked pending, locates the matching
 YAML under ``experiments/configs/**``, and renders one ``.sbatch`` per pending
-config into ``slurm/pending/``. It NEVER submits anything (Claude Code has no HPC
-access); a human submits the generated files with ``sbatch`` manually.
+config into ``slurm/pending/`` using the fixed apptainer template (constitution
+s.9). It NEVER submits anything -- Claude Code has no HPC access; a human submits
+the generated files with ``sbatch`` manually.
 
-    python slurm/generate_jobs.py [--time 24:00:00] [--mem 32G] [--gpus 1]
+Cluster-specific values (``--time``, ``--account``, ``--container-image``) are
+supplied as CLI arguments with placeholder defaults; they are external to the
+repo. The container image (e.g. ``torch_fl.sif``) is a fixed external dependency
+that this repo neither builds nor manages -- we only reference its known path.
+
+    python slurm/generate_jobs.py \
+        --account NAISS-XXXX --container-image /path/to/torch_fl.sif --time 24:00:00
 """
 
 import argparse
@@ -19,8 +26,6 @@ _QUEUE = os.path.join(_REPO_ROOT, "experiments", "QUEUE.md")
 _CONFIG_ROOT = os.path.join(_REPO_ROOT, "experiments", "configs")
 _TEMPLATE = os.path.join(_REPO_ROOT, "slurm", "templates", "single_run.sbatch.j2")
 _PENDING = os.path.join(_REPO_ROOT, "slurm", "pending")
-
-_DEFAULT_ENV_SETUP = "module load Anaconda3\nconda activate arren_fastdev_torch"
 
 
 def parse_pending(queue_path):
@@ -65,15 +70,13 @@ def render(args):
             print(f"  [skip] {filename}: not found under experiments/configs/")
             continue
         job_name = re.sub(r"\.ya?ml$", "", filename)
+        # repo-relative: the sbatch is submitted from the repo root on HPC
         config_rel_path = os.path.relpath(config_path, _REPO_ROOT)
         rendered = template.render(
-            job_name=job_name,
-            gpus=args.gpus,
-            mem=args.mem,
-            time=args.time,
-            log_dir=args.log_dir,
-            env_setup=args.env_setup,
-            config_rel_path=config_rel_path,
+            time_limit=args.time,
+            account=args.account,
+            container_image=args.container_image,
+            config_path=config_rel_path,
         )
         out_path = os.path.join(_PENDING, f"{job_name}.sbatch")
         with open(out_path, "w") as f:
@@ -86,11 +89,10 @@ def render(args):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--time", default="24:00:00")
-    parser.add_argument("--mem", default="32G")
-    parser.add_argument("--gpus", default="1")
-    parser.add_argument("--log-dir", default="logs")
-    parser.add_argument("--env-setup", default=_DEFAULT_ENV_SETUP)
+    parser.add_argument("--time", default="24:00:00", help="SBATCH -t time limit")
+    parser.add_argument("--account", default="${SLURM_ACCOUNT}", help="SBATCH -A account/project")
+    parser.add_argument("--container-image", default="${CONTAINER_IMAGE}",
+                        help="apptainer .sif image path (external fixed dependency)")
     render(parser.parse_args())
 
 

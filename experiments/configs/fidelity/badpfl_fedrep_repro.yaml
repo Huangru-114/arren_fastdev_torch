@@ -4,6 +4,7 @@
 name: badpfl_fedrep_repro
 
 dataset: cifar10
+data_root: ${DATA_ROOT}   # 外部 HPC 路径，运行时由 env/--data-root 注入
 num_classes: 10
 input_channel: 3
 partition: dirichlet

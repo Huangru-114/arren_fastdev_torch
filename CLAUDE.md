@@ -77,6 +77,11 @@ results/           # 精简结果提交入库，重文件本地保留
   避免 yaml 里手滑打错字段名导致运行时静默出错。
 - `fidelity/` 下的配置需精确复刻论文原始实验设置（数据集、划分方式、模型、FL 算法）；
   `matrix/` 下的配置用于广泛的攻防组合探索。
+- **数据集根目录是 HPC 上的外部资源（如 `/nobackup/proj/disk/.../data`），不属于本仓库，
+  仓库内任何 `.py`/`.yaml` 都不得硬编码这个绝对路径。** 统一做法：config schema 中定义一个
+  `data_root` 字段，真实路径只在 HPC 侧通过环境变量或命令行参数注入
+  （例如 `--data-root $DATA_ROOT`），仓库里的 `fidelity/`、`matrix/` yaml 示例中该字段留空
+  或写作占位符（如 `${DATA_ROOT}`），由 `experiments/run_single.py` 在启动时从环境变量解析。
 
 ## 6. 两阶段工作流：提炼 → 入库
 
@@ -91,6 +96,9 @@ results/           # 精简结果提交入库，重文件本地保留
 - **Tier A · 接线冒烟测试**（Claude Code 自测，不依赖 HPC）：用极小合成数据（如 2 个 client、
   5 个样本、1 轮通信）在 CPU 上跑几秒钟，只验证代码不报错、张量形状正确、hook 确实被调用、
   config 能被正确解析。**每次新增/修改 strategy 后必须当场自测通过才算完成。**
+  Tier A 使用的合成数据必须在代码内生成（如随机张量/内置小数据集），**绝不能引用
+  `data_root`/HPC 数据目录路径**——Claude Code 沙盒物理上访问不到该路径，若测试中出现
+  相关报错，应识别为"路径在此环境不存在"，而不是代码逻辑错误。
 - **Tier B · 保真度/性能验证**（必须 HPC，用户手动提交）：判断"论文方法是否真的有效"的
   唯一依据，结果通过 git 回填到 `results/`。
 - Claude Code **不得**基于 Tier A 的结果对最终效果做任何结论性断言（如"这个改动应该能提升 ASR"）。
@@ -117,9 +125,29 @@ results/           # 精简结果提交入库，重文件本地保留
 
 - `slurm/generate_jobs.py` 只读取 `QUEUE.md` 中 `pending` 项，渲染出 `.sbatch` 文件放入
   `slurm/pending/`，commit 入库，**不执行**任何提交命令。
-- `.sbatch` 模板中只包含资源请求（`--gres`、`--mem`、`--time`）与环境准备
-  （`module load`/`conda activate`），最后一行统一调用 `python experiments/run_single.py --config $CFG`，
-  不包含任何攻防算法逻辑。
+- `.sbatch` 模板结构固定，通过 apptainer 容器承载完整 GPU/torch 环境：
+
+  ```bash
+  #!/bin/bash
+  #SBATCH -n 1
+  #SBATCH -c 4
+  #SBATCH --gpus 1
+  #SBATCH -t {{ time_limit }}
+  #SBATCH -A {{ account }}
+  #SBATCH -p gpu
+  module load GPU/buildenv-nvhpc/25.9-cu13.0
+  apptainer exec --nv {{ container_image }} python3 experiments/run_single.py --config {{ config_path }}
+  ```
+
+  `{{ container_image }}`、`{{ config_path }}`、`{{ time_limit }}`、`{{ account }}` 由
+  `generate_jobs.py` 从 `QUEUE.md` 的 pending 项渲染填入。容器内统一调用
+  `experiments/run_single.py`，**不直接调用**各篇论文自己的 `main.py`——后者只作为
+  `strategies/` 提炼逻辑时的参考，不再是实际运行入口。
+- **容器镜像（如 `torch_fl.sif`）是外部固定依赖，不属于本仓库管理范围**：不需要维护、
+  不需要构建定义、Claude Code 不应尝试修改或重建它，只需要在生成 `.sbatch` 时引用其
+  已知路径即可。
+- Claude Code 沙盒自身的 Tier A 测试环境（见第 7 节）与 HPC 容器环境相互独立，
+  不需要保持一致，也不应尝试在沙盒里复现完整 GPU/CUDA 环境。
 
 ## 10. 何时自主推进，何时停下确认
 

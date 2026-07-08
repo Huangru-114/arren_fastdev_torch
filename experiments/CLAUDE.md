@@ -5,7 +5,10 @@
   写 `results/<hash>/{metrics.json,summary.md}`。任意 `(fl_method, partition, attack, defense)`
   组合无需专门胶水代码。
 - `config.py`：YAML → 校验后的 `ExperimentConfig`。未知字段（打错字）直接报错；
-  枚举字段校验；`config_hash` 决定 `results/` 目录名（排除 `device` 等运行期字段）。
+  枚举字段校验；`config_hash` 决定 `results/` 目录名（排除 `device`、`data_root` 等运行期字段）。
+- **数据集根目录（`data_root`，宪法 s.5）**：外部 HPC 路径，仓库内绝不硬编码。yaml 里写占位符
+  `${DATA_ROOT}`，`run_single.py` 启动时按 `--data-root` > `DATA_ROOT` 环境变量的优先级解析；
+  真实数据集未解析则报错，`synthetic`（Tier A）不需要它。因排除出 hash，注入路径不影响 `results/` 目录名。
 - `configs/fidelity/`：精确复刻论文设置（Bad-PFL×FedBN/FedRep，CIFAR-10，dir 0.5）。
 - `configs/matrix/`：攻防×划分组合探索（含 pathological 与更强 dirichlet）。
 - `smoke_test.py`：Tier A 接线冒烟测试（合成数据、CPU、数秒）；改动策略后必须当场通过。
